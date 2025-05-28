@@ -58,7 +58,7 @@ pub(crate) use crate::config::*;
 pub use crate::fs::create_file;
 use crate::kernel::is_uhyve_with_pci;
 use crate::scheduler::{PerCoreScheduler, PerCoreSchedulerExt};
-
+pub mod tracepoint;
 #[macro_use]
 mod macros;
 
