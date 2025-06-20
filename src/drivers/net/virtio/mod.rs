@@ -15,6 +15,7 @@ use alloc::vec::Vec;
 
 use smoltcp::phy::{Checksum, ChecksumCapabilities};
 use smoltcp::wire::{ETHERNET_HEADER_LEN, EthernetFrame, Ipv4Packet, Ipv6Packet};
+use tracepoint::define_event_trace;
 use virtio::net::{ConfigVolatileFieldAccess, Hdr, HdrF};
 use virtio::{DeviceConfigSpace, FeatureBits};
 use volatile::VolatileRef;
@@ -36,6 +37,7 @@ use crate::drivers::virtio::virtqueue::{
 use crate::drivers::{Driver, InterruptLine};
 use crate::executor::device::{RxToken, TxToken};
 use crate::mm::device_alloc::DeviceAlloc;
+use crate::tracepoint::{Kops, TraceLock};
 
 /// A wrapper struct for the raw configuration structure.
 /// Handling the right access to fields, as some are read-only
@@ -312,6 +314,26 @@ impl NetworkDriver for VirtioNetDriver {
 				.ok()?;
 			let header = buffer_tkn.used_recv_buff.pop_front_downcast::<Hdr>()?;
 			let packet = buffer_tkn.used_recv_buff.pop_front_vec()?;
+			define_event_trace!(
+				receive_packet,
+				TP_lock(TraceLock<()>),
+				TP_kops(Kops),
+				TP_system(virtio_net),
+				TP_PROTO(packet: &[u8]),
+				TP_STRUCT__entry {
+					packet_ptr: *const u8,
+					packet_len: u32,
+				},
+				TP_fast_assign {
+					packet_ptr: packet.as_ptr(),
+					packet_len: packet.len() as u32,
+				},
+				TP_ident(__entry),
+				TP_printk ({
+					format!("Received packet, it's buffer address: {:#x}, length: {}", __entry.packet_ptr as usize, __entry.packet_len)
+				})
+			);
+			trace_receive_packet(&packet);
 			Some((header, packet))
 		};
 

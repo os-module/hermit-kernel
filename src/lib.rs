@@ -18,6 +18,8 @@
 #![feature(never_type)]
 #![feature(slice_from_ptr_range)]
 #![feature(slice_ptr_get)]
+#![feature(addr_parse_ascii)]
+#![feature(ip_as_octets)]
 #![cfg_attr(
 	any(target_arch = "aarch64", target_arch = "riscv64"),
 	feature(specialization)
@@ -31,7 +33,7 @@
 	reexport_test_harness_main = "test_main"
 )]
 #![cfg_attr(all(target_os = "none", test), no_main)]
-
+#![allow(non_upper_case_globals)]
 // EXTERNAL CRATES
 #[macro_use]
 extern crate alloc;
@@ -58,7 +60,6 @@ pub(crate) use crate::config::*;
 pub use crate::fs::create_file;
 use crate::kernel::is_uhyve_with_pci;
 use crate::scheduler::{PerCoreScheduler, PerCoreSchedulerExt};
-pub mod tracepoint;
 #[macro_use]
 mod macros;
 
@@ -69,6 +70,8 @@ pub mod arch;
 mod config;
 pub mod console;
 mod drivers;
+
+mod ebpf;
 mod entropy;
 mod env;
 pub mod errno;
@@ -84,6 +87,8 @@ mod shell;
 mod synch;
 pub mod syscalls;
 pub mod time;
+
+pub mod tracepoint;
 
 hermit_entry::define_abi_tag!();
 
@@ -232,6 +237,30 @@ fn boot_processor_main() -> ! {
 		)
 	};
 
+	// Start the ebpf task.
+	#[cfg(feature = "udp")]
+	unsafe {
+		log::info!("Starting eBPF task");
+		scheduler::PerCoreScheduler::spawn(
+			crate::tracepoint::ebpf_task,
+			0,
+			scheduler::task::NORMAL_PRIO,
+			0,
+			USER_STACK_SIZE,
+		)
+	};
+	#[cfg(feature = "udp")]
+	unsafe {
+		log::info!("Starting tracepoint reader task");
+		scheduler::PerCoreScheduler::spawn(
+			crate::tracepoint::read_tracepoint_records,
+			0,
+			scheduler::task::NORMAL_PRIO,
+			0,
+			USER_STACK_SIZE,
+		)
+	};
+
 	// Run the scheduler loop.
 	PerCoreScheduler::run();
 }
@@ -250,6 +279,7 @@ fn application_processor_main() -> ! {
 	synch_all_cores();
 	crate::executor::init();
 
+	log::error!("Application processor {} started", core_local::core_id());
 	// Run the scheduler loop.
 	PerCoreScheduler::run();
 }

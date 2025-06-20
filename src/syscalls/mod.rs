@@ -7,6 +7,7 @@ use core::marker::PhantomData;
 use core::ptr;
 
 use hermit_sync::Lazy;
+use tracepoint::define_event_trace;
 
 pub use self::condvar::*;
 pub use self::entropy::*;
@@ -28,6 +29,7 @@ use crate::fs::{self, FileAttr};
 #[cfg(all(target_os = "none", not(feature = "common-os")))]
 use crate::mm::ALLOCATOR;
 use crate::syscalls::interfaces::SyscallInterface;
+use crate::tracepoint::{Kops, TraceLock};
 use crate::{env, io};
 
 mod condvar;
@@ -328,6 +330,29 @@ pub unsafe extern "C" fn sys_opendir(name: *const c_char) -> FileDescriptor {
 	}
 }
 
+define_event_trace!(
+	enter_openat,
+	TP_lock(TraceLock<()>),
+	TP_kops(Kops),
+	TP_system(syscalls),
+	TP_PROTO(name: *const c_char, flags: i32, mode: u32),
+	TP_STRUCT__entry {
+		name_ptr: *const c_char,
+		flags: i32,
+		mode: u32,
+	},
+	TP_fast_assign {
+		name_ptr: name,
+		flags: flags,
+		mode: mode,
+	},
+	TP_ident(__entry),
+	TP_printk ({
+		let name = unsafe { CStr::from_ptr(__entry.name_ptr) };
+		format!("name: {}, flags: {:#x}, mode: {:#x}", name.to_string_lossy(), __entry.flags, __entry.mode)
+	})
+);
+
 #[hermit_macro::system]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sys_open(name: *const c_char, flags: i32, mode: u32) -> FileDescriptor {
@@ -338,8 +363,9 @@ pub unsafe extern "C" fn sys_open(name: *const c_char, flags: i32, mode: u32) ->
 		return -crate::errno::EINVAL;
 	};
 
-	if let Ok(name) = unsafe { CStr::from_ptr(name) }.to_str() {
-		crate::fs::open(name, flags, mode)
+	if let Ok(f_name) = unsafe { CStr::from_ptr(name) }.to_str() {
+		trace_enter_openat(name, flags.bits(), mode.bits());
+		crate::fs::open(f_name, flags, mode)
 			.unwrap_or_else(|e| -num::ToPrimitive::to_i32(&e).unwrap())
 	} else {
 		-crate::errno::EINVAL
