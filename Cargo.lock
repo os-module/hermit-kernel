@@ -230,6 +230,7 @@ dependencies = [
 [[package]]
 name = "bpf-basic"
 version = "0.1.0"
+source = "git+https://github.com/Godones/ext_ebpf#380c98096214afd4936dbe1bef9db0cc40d232dc"
 dependencies = [
  "bitflags 2.9.1",
  "int-enum",
@@ -529,6 +530,7 @@ dependencies = [
 [[package]]
 name = "ebpf-command"
 version = "0.1.0"
+source = "git+https://github.com/Godones/ext_ebpf#380c98096214afd4936dbe1bef9db0cc40d232dc"
 dependencies = [
  "bitflags 2.9.1",
 ]

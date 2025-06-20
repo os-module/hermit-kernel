@@ -149,8 +149,8 @@ uhyve-interface = "0.1.3"
 lru = { version = "0.14", features = ["nightly"] }
 tracepoint = { git = "https://github.com/Godones/ext_ebpf" }
 static-keys = "0.7"
-ebpf-command = { path = "../../os-modules/ext_ebpf/unikernel/ebpf-command" }
-bpf-basic = { path = "../../os-modules/ext_ebpf/bpf-basic" }
+ebpf-command = { git = "https://github.com/Godones/ext_ebpf" }
+bpf-basic = { git = "https://github.com/Godones/ext_ebpf" }
 rbpf = { git = "https://github.com/qmonnet/rbpf.git", default-features = false }
 
 [dependencies.smoltcp]
